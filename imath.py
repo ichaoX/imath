@@ -17,7 +17,7 @@ class IMath(cmd.Cmd):
     proc = None
     pty = None
     prompt = 'In[*]:= '
-    line = ''
+    line = b''
     buf = ''
     interrupt = False
     _init = threading.Lock()
@@ -84,9 +84,9 @@ class IMath(cmd.Cmd):
         if self.proc.poll() != None:
             return True
         cmd += '\n'
-        cmd = cmd.encode('utf8')
+        cmd = cmd.encode('utf-8')
         if self.pty:
-            self._input = cmd.count('\n')
+            self._input = cmd.count(b'\n')
             os.write(self.pty, cmd)
         else:
             self.proc.stdin.write(cmd)
@@ -101,6 +101,8 @@ class IMath(cmd.Cmd):
         return self.eval(line)
 
     def precmd(self, line):
+        if line == 'EOF' and self.proc.poll() != None:
+            return line
         if self.interrupt:
             return line
         self.buf += ('\n' if self.buf else '')+line
@@ -139,8 +141,11 @@ class IMath(cmd.Cmd):
         #    self.handle(line.decode('utf-8'))
 
     def handle(self, c):
-        self.line = self.line + c.decode()
-        line = self.line
+        self.line += c
+        try:
+            line = self.line.decode('utf-8')
+        except UnicodeDecodeError:
+            return
         flag = re.sub(r'^(\x1b\[..)+', '', line)[:2]
 
         while True:
@@ -179,7 +184,7 @@ class IMath(cmd.Cmd):
             self.echo(line)
             break
 
-        self.line = ''
+        self.line = b''
 
     def echo(self, data):
         sys.stdout.write(data)
@@ -200,12 +205,13 @@ def main():
     parser.add_argument("-k", "--kernel", type=str, default="math", help="kernel path")
     parser.add_argument("-w", "--width", type=int, default=None, help="set page width")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="log level")
-    args = parser.parse_args()
+    args, options = parser.parse_known_args()
 
     try:
-        cli = IMath(args.kernel)
-        if args.width:
-            cli.shadow('SetOptions["stdout", PageWidth->'+str(args.width)+']')
+        cli = IMath([args.kernel]+options)
+        if args.width != None:
+            cli.shadow('SetOptions["stdout", PageWidth->%s]' % (
+                args.width if args.width > 0 else "Infinity"))
         cli.console()
     except Exception as e:
         if args.verbose:
@@ -213,7 +219,11 @@ def main():
         else:
             print(e)
     finally:
-        os._exit(0)
+        try:
+            cli.proc.kill()
+            os._exit(cli.proc.returncode or 0)
+        finally:
+            return
 
 
 if __name__ == "__main__":
