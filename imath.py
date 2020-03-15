@@ -13,6 +13,9 @@ import time
 import traceback
 
 
+__version__ = '0.1.0'
+
+
 class IMath(cmd.Cmd):
     proc = None
     pty = None
@@ -38,8 +41,8 @@ class IMath(cmd.Cmd):
         self._running.acquire()
         t = threading.Thread(target=self.output)
         t.start()
-        self._init.acquire()
-        self._init.release()
+        while self._init.locked():
+            time.sleep(0.01)
 
     def console(self):
         readline.set_completer_delims(' \t\n~!@#%^&*()_+-={}[]|\\:;"\'<>,.?/')
@@ -205,7 +208,11 @@ def main():
     parser.add_argument("-k", "--kernel", type=str, default="math", help="kernel path")
     parser.add_argument("-w", "--width", type=int, default=None, help="set page width")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="log level")
+    parser.add_argument("-V", "--version", action='version', version=__version__)
     args, options = parser.parse_known_args()
+
+    if '--' in options:
+        options.remove('--')
 
     try:
         cli = IMath([args.kernel]+options)
