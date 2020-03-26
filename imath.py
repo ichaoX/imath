@@ -61,7 +61,7 @@ class IMath(cmd.Cmd):
             return None
         elif state == 0:
             self._res = []
-            self.shadow('Print/@Names["'+text+'*"]', True)
+            self.shadow('Print/@Join@@{Names[#],Contexts[#]}&@"'+text+'*"', True)
         try:
             return self._res[state]
         except IndexError as e:
