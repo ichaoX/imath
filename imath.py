@@ -13,7 +13,7 @@ import time
 import traceback
 
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 
 
 class IMath(cmd.Cmd):
@@ -28,6 +28,7 @@ class IMath(cmd.Cmd):
     _shadow = threading.Lock()
     _input = 0
     _res = None
+    _cache = dict()
 
     def __init__(self, kernel='math'):
         cmd.Cmd.__init__(self)
@@ -54,18 +55,46 @@ class IMath(cmd.Cmd):
     def complete(self, text, state):
         if self.interrupt:
             return None
-        #origline = readline.get_line_buffer()
-        #r = re.search(r'([\$a-z][\$_a-z0-9`]*)$', origline, re.IGNORECASE)
-            #w = r.group(1)
         if not text:
             return None
         elif state == 0:
+            line = readline.get_line_buffer()
+            bi = readline.get_begidx()
             self._res = []
-            self.shadow('Print/@Join@@{Names[#],Contexts[#]}&@"'+text+'*"', True)
+            while True:
+                if re.search(r'<<\s*"?$', line[:bi], re.IGNORECASE):
+                    self.complete_get_contexts(text)
+                    break
+                else:
+                    self.shadow('Print/@Join@@{Names[#],Contexts[#]}&@"'+text+'*"', True)
+                break
         try:
             return self._res[state]
         except IndexError as e:
             return None
+
+    def complete_get_contexts(self, text):
+        cache_key = 'contexts'
+        res = self._cache.get(cache_key)
+        if not res:
+            code = '''StringReplace[#, $PathnameSeparator -> "`"] & /@
+              Block[{$$l = {}, $$v = $Messages},
+               $Messages = {};
+               If[Check[SetDirectory[#] =!= $Failed, False],
+                  AppendTo[$$l,
+                   Check[FileNames[{"*.mx", "*.wl", "*.m",
+                      "*.mx/" <> $SystemID <> "/*.mx", "*/Kernel/init.wl",
+                      "*/Kernel/init.m", "*/init.m"}, "", 2], {}]];
+                  ResetDirectory[]] & /@ $Path;
+               $Messages = $$v;
+               Join @@ $$l] // Union'''
+            self._res = []
+            self.shadow('Print/@('+code+")", True)
+            res = list(set(re.sub(r'((`Kernel)?`init)?(.(mx|wl|m))$', '`', contexts) for contexts in self._res))
+            self._cache[cache_key] = res
+        res = list(filter(lambda txt: txt.startswith(text), res))
+        self._res = res
+        return
 
     def shadow(self, cmd, multi=False):
         cmd = '{$$v,$$l}={%,$Line};'+cmd+';$Line=$$l-1;$$v;'
