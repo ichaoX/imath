@@ -58,6 +58,8 @@ class IMath(cmd.Cmd):
         if not text:
             return None
         elif state == 0:
+            if self._running.locked():
+                return None
             line = readline.get_line_buffer()
             bi = readline.get_begidx()
             self._res = []
@@ -93,6 +95,7 @@ class IMath(cmd.Cmd):
             res = list(set(re.sub(r'((`Kernel)?`init)?(.(mx|wl|m))$', '`', contexts) for contexts in self._res))
             self._cache[cache_key] = res
         res = list(filter(lambda txt: txt.startswith(text), res))
+        res.sort()
         self._res = res
         return
 
@@ -201,6 +204,8 @@ class IMath(cmd.Cmd):
                 break
 
             if self._shadow.locked():
+                if line.startswith('\x1b['):
+                    break
                 w = line.strip()
                 if w == '':
                     self._shadow.release()
