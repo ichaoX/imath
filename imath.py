@@ -68,7 +68,7 @@ class IMath(cmd.Cmd):
                     self.complete_get_contexts(text)
                     break
                 else:
-                    self.shadow('Print/@Join@@{Names[#],Contexts[#]}&@"'+text+'*"', True)
+                    self.shadow('WriteString[$Output,#,"\n"]&/@Join@@{Names[#],Contexts[#]}&@"'+text+'*"', True)
                 break
         try:
             return self._res[state]
@@ -91,7 +91,7 @@ class IMath(cmd.Cmd):
                $Messages = $$v;
                Join @@ $$l] // Union'''
             self._res = []
-            self.shadow('Print/@('+code+")", True)
+            self.shadow('WriteString[$Output,#,"\n"]&/@('+code+")", True)
             res = list(set(re.sub(r'((`Kernel)?`init)?(.(mx|wl|m))$', '`', contexts) for contexts in self._res))
             self._cache[cache_key] = res
         res = list(filter(lambda txt: txt.startswith(text), res))
@@ -152,7 +152,7 @@ class IMath(cmd.Cmd):
             return True
         sl = str(len(cmd))
         s = '"'+cmd.replace('\\', '\\\\').replace('"', '\\"')+'"'
-        self.shadow("Print[SyntaxLength@"+s+">="+sl+"&&!SyntaxQ@"+s+"]")
+        self.shadow("WriteString[$Output,SyntaxLength@"+s+">="+sl+"&&!SyntaxQ@"+s+',"\n"]')
         try:
             return self._res != "True"
         finally:
