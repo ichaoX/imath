@@ -43,6 +43,8 @@ class IMath(cmd.Cmd):
         t = threading.Thread(target=self.output)
         t.start()
         while self._init.locked():
+            if self.proc.poll() != None:
+                raise Exception('Quit')
             time.sleep(0.01)
 
     def console(self):
