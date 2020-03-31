@@ -18,6 +18,7 @@ __version__ = '0.3.0'
 
 class IMath(cmd.Cmd):
     ignore_case = True
+    history_path = os.path.expanduser('~/.imath_history')
     proc = None
     pty = None
     prompt = 'In[*]:= '
@@ -45,10 +46,11 @@ class IMath(cmd.Cmd):
         t.start()
         while self._init.locked():
             if self.proc.poll() != None:
-                raise Exception('Quit')
+                raise IOError('Quit')
             time.sleep(0.01)
 
     def console(self):
+        self._load_history()
         readline.set_completer_delims(' \t\n~!@#%^&*()_+-={}[]|\\:;"\'<>,.?/')
         readline.parse_and_bind("tab: complete")
         if self.pty:
@@ -68,7 +70,7 @@ class IMath(cmd.Cmd):
             self._res = []
             while True:
                 if re.search(r'<<\s*"?$', line[:bi], re.IGNORECASE):
-                    self.complete_get_contexts(text)
+                    self._get_contexts(text)
                     break
                 else:
                     self.shadow('WriteString[$Output,#,"\n"]&/@Join@@{Names[#,IgnoreCase->'+(
@@ -80,7 +82,7 @@ class IMath(cmd.Cmd):
         except IndexError as e:
             return None
 
-    def complete_get_contexts(self, text):
+    def _get_contexts(self, text):
         cache_key = 'contexts'
         res = self._cache.get(cache_key)
         if not res:
@@ -104,6 +106,17 @@ class IMath(cmd.Cmd):
         self._res = res
         return
 
+    def _load_history(self):
+        open(self.history_path, 'a').close()
+        readline.set_history_length(100)
+        try:
+            readline.read_history_file(self.history_path)
+        except IOError:
+            pass
+
+    def save_history(self):
+        readline.write_history_file(self.history_path)
+
     def shadow(self, cmd, multi=False):
         cmd = '{$$v,$$l}={%,$Line};'+cmd+';$Line=$$l-1;$$v;'
         self._shadow.acquire()
@@ -111,7 +124,7 @@ class IMath(cmd.Cmd):
         self.eval(cmd)
 
     def eval(self, cmd):
-        if cmd == 'EOF' or self.proc.poll() != None:
+        if self.proc.poll() != None:
             return True
         self._running.acquire()
         self.send(cmd)
@@ -141,7 +154,9 @@ class IMath(cmd.Cmd):
         return self.eval(line)
 
     def precmd(self, line):
-        if line == 'EOF' and self.proc.poll() != None:
+        if line == 'EOF':
+            raise EOFError()
+        if self.proc.poll() != None:
             return line
         if self.interrupt:
             return line
@@ -268,6 +283,7 @@ def main():
             print(e)
     finally:
         try:
+            cli.save_history()
             cli.proc.kill()
             os._exit(cli.proc.returncode or 0)
         finally:
