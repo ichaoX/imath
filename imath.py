@@ -13,10 +13,11 @@ import time
 import traceback
 
 
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 
 
 class IMath(cmd.Cmd):
+    ignore_case = True
     proc = None
     pty = None
     prompt = 'In[*]:= '
@@ -70,7 +71,9 @@ class IMath(cmd.Cmd):
                     self.complete_get_contexts(text)
                     break
                 else:
-                    self.shadow('WriteString[$Output,#,"\n"]&/@Join@@{Names[#],Contexts[#]}&@"'+text+'*"', True)
+                    self.shadow('WriteString[$Output,#,"\n"]&/@Join@@{Names[#,IgnoreCase->'+(
+                        'True' if self.ignore_case else 'False'
+                        )+'],Contexts[#]}&@"'+text+'*"', True)
                 break
         try:
             return self._res[state]
@@ -241,6 +244,7 @@ class IMath(cmd.Cmd):
 def main():
     import argparse
     parser = argparse.ArgumentParser("imath")
+    parser.add_argument("-c", "--case-sensitive", action='store_true', default=False, help="case-sensitive completion")
     parser.add_argument("-k", "--kernel", type=str, default="math", help="kernel path")
     parser.add_argument("-w", "--width", type=int, default=None, help="set page width")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="log level")
@@ -252,6 +256,7 @@ def main():
 
     try:
         cli = IMath([args.kernel]+options)
+        cli.ignore_case = not args.case_sensitive
         if args.width != None:
             cli.shadow('SetOptions["stdout", PageWidth->%s]' % (
                 args.width if args.width > 0 else "Infinity"))
