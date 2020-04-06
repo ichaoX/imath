@@ -286,6 +286,9 @@ def main():
     finally:
         try:
             cli.save_history()
+        except IOError:
+            pass
+        try:
             cli.proc.kill()
             os._exit(cli.proc.returncode or 0)
         finally:
