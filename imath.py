@@ -13,7 +13,7 @@ import time
 import traceback
 
 
-__version__ = '0.3.0'
+__version__ = '0.4.0'
 
 
 class IMath(cmd.Cmd):
@@ -102,6 +102,8 @@ class IMath(cmd.Cmd):
             res = list(set(re.sub(r'((`Kernel)?`init)?(.(mx|wl|m))$', '`', contexts) for contexts in self._res))
             self._cache[cache_key] = res
         res = list(filter(lambda txt: txt.startswith(text), res))
+        self.shadow('WriteString[$Output,#,"\n"]&/@Contexts["'+text+'*"]', True)
+        res = list(set(res+self._res))
         res.sort()
         self._res = res
         return
